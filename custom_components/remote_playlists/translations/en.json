@@ -1,0 +1,18 @@
+{
+    "config": {
+        "step": {
+            "user": {
+                "description": "Please enter a remotely accessible playlist URL.",
+                "data": {
+                    "playlist_url": "https://example.com/playlist.m3u"
+                }
+            }
+        },
+        "error": {
+            "invalid_playlist": "Please enter a valid playlist"
+        },
+        "abort": {
+            "already_configured": "[%key:common::config_flow::abort::already_configured_device%]"
+        }
+    }
+}
