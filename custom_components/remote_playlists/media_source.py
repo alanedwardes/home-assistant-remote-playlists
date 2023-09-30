@@ -13,6 +13,7 @@ from homeassistant.components.media_source.models import (
 import aiohttp
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
+from .m3u_parser import M3uParser
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -20,69 +21,35 @@ from .const import DOMAIN
 
 
 async def async_get_media_source(hass: HomeAssistant) -> RemotePlaylistMediaSource:
-    entry = hass.config_entries.async_entries(DOMAIN)[0]
+    entries = hass.config_entries.async_entries(DOMAIN)
+    entry = entries[0]
     return RemotePlaylistMediaSource(hass, entry)
 
 
 class RemotePlaylistMediaSource(MediaSource):
-    name = "Remote Playlists"
+    name = "Remote Playlist"
 
     def __init__(self, hass: HomeAssistant, config: ConfigItem) -> None:
         super().__init__(DOMAIN)
         self.hass = hass
         self.config = config
+        self.name = self.config.data["title"]
 
-    async def __async_read_response(self, response):
-        """Reads the response, logging any json errors"""
-
-        text = await response.text()
-
-        if response.status >= 400:
-            _LOGGER.error(f"Request failed: {response.status}: {text}")
-            return None
-
-        try:
-            return json.loads(text)
-        except:
-            raise Exception(f"Failed to extract response json: {text}")
-
-    async def async_resolve_media(self, item: MediaSourceItem) -> PlayMedia:
-        url = (
-            "https://open.live.bbc.co.uk/mediaselector/6/select/version/2.0/mediaset/iptv-all/vpid/"
-            + item.identifier
-            + "/format/json"
-        )
-
+    async def async_resolve_playlist(self, playlist_url) -> str:
         async with aiohttp.ClientSession() as client:
-            async with client.get(url) as mediaset_response:
-                mediaset = await self.__async_read_response(mediaset_response)
-                (video,) = filter(lambda x: x["kind"] == "video", mediaset["media"])
-
-                connections = filter(
-                    lambda x: x["protocol"] == "https", video["connection"]
-                )
-
-                connections = filter(
-                    lambda x: x["transferFormat"] == "dash", connections
-                )
-
-                connection = next(connections, None)
-
-                _LOGGER.info(connection)
-
-                return PlayMedia(connection["href"], video["type"])
+            async with client.get(playlist_url) as playlist_response:
+                return await playlist_response.text()
 
     async def async_browse_media(
         self,
         item: MediaSourceItem,
     ) -> BrowseMediaSource:
-        print(self.config.data["playlist_url"])
         return BrowseMediaSource(
             domain=DOMAIN,
             identifier=None,
             media_class=MediaClass.CHANNEL,
             media_content_type=MediaType.VIDEO,
-            title="BBC Channels",
+            title=self.config.data["title"],
             can_play=False,
             can_expand=True,
             children_media_class=MediaClass.DIRECTORY,
@@ -92,94 +59,30 @@ class RemotePlaylistMediaSource(MediaSource):
     async def _async_build_channels(
         self, item: MediaSourceItem
     ) -> list[BrowseMediaSource]:
-        channel_list = [
-            ("bbc_one_hd", "BBC One"),
-            ("bbc_two_hd", "BBC Two"),
-            ("bbc_four_hd", "BBC Four"),
-            ("cbbc_hd", "CBBC"),
-            ("cbeebies_hd", "CBeebies"),
-            ("bbc_news24", "BBC News Channel"),
-            ("bbc_parliament", "BBC Parliament"),
-            ("bbc_alba", "Alba"),
-            ("s4cpbs", "S4C"),
-            ("bbc_one_london", "BBC One London"),
-            ("bbc_one_scotland_hd", "BBC One Scotland"),
-            ("bbc_one_northern_ireland_hd", "BBC One Northern Ireland"),
-            ("bbc_one_wales_hd", "BBC One Wales"),
-            ("bbc_two_scotland", "BBC Two Scotland"),
-            ("bbc_two_northern_ireland_digital", "BBC Two Northern Ireland"),
-            ("bbc_two_wales_digital", "BBC Two Wales"),
-            (
-                "bbc_two_england",
-                "BBC Two England",
-            ),
-            (
-                "bbc_one_cambridge",
-                "BBC One Cambridge",
-            ),
-            (
-                "bbc_one_channel_islands",
-                "BBC One Channel Islands",
-            ),
-            (
-                "bbc_one_east",
-                "BBC One East",
-            ),
-            (
-                "bbc_one_east_midlands",
-                "BBC One East Midlands",
-            ),
-            (
-                "bbc_one_east_yorkshire",
-                "BBC One East Yorkshire",
-            ),
-            (
-                "bbc_one_north_east",
-                "BBC One North East",
-            ),
-            (
-                "bbc_one_north_west",
-                "BBC One North West",
-            ),
-            (
-                "bbc_one_oxford",
-                "BBC One Oxford",
-            ),
-            (
-                "bbc_one_south",
-                "BBC One South",
-            ),
-            (
-                "bbc_one_south_east",
-                "BBC One South East",
-            ),
-            (
-                "bbc_one_west",
-                "BBC One West",
-            ),
-            (
-                "bbc_one_west_midlands",
-                "BBC One West Midlands",
-            ),
-            (
-                "bbc_one_yorks",
-                "BBC One Yorks",
-            ),
-        ]
+        playlist_text = await self.async_resolve_playlist(
+            self.config.data["playlist_url"]
+        )
+
+        parser = M3uParser()
+        await parser.parse_m3u_content(playlist_text)
+        playlist = parser.get_list()
 
         sources = []
 
-        for identifier, name in channel_list:
+        for playlist_item in playlist:
             sources.append(
                 BrowseMediaSource(
                     domain=DOMAIN,
-                    identifier=identifier,
+                    identifier=playlist_item["url"],
                     media_class=MediaClass.CHANNEL,
                     media_content_type=MediaType.VIDEO,
-                    title=name,
+                    title=playlist_item["name"],
                     can_play=True,
                     can_expand=False,
                 )
             )
 
         return sources
+
+    async def async_resolve_media(self, item: MediaSourceItem) -> PlayMedia:
+        return PlayMedia(item.identifier, "video/mp4")

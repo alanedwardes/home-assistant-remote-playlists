@@ -4,6 +4,7 @@
       "user": {
         "description": "Please enter a remotely accessible playlist URL.",
         "data": {
+          "title": "My Playlist",
           "playlist_url": "https://example.com/playlist.m3u"
         }
       }

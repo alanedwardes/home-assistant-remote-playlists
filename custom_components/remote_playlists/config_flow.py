@@ -17,9 +17,7 @@ _LOGGER = logging.getLogger(__name__)
 
 # TODO adjust the data schema to the data that you need
 STEP_USER_DATA_SCHEMA = vol.Schema(
-    {
-        vol.Required("playlist_url"): str,
-    }
+    {vol.Required("title"): str, vol.Required("playlist_url"): str}
 )
 
 
@@ -37,11 +35,11 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 step_id="user", data_schema=STEP_USER_DATA_SCHEMA
             )
 
-        if not user_input["playlist_url"]:
-            errors = {}
-            errors["base"] = "invalid_playlist"
-            return self.async_show_form(
-                step_id="user", data_schema=STEP_USER_DATA_SCHEMA, errors=errors
-            )
+        # if not user_input["playlist_url"]:
+        #    errors = {}
+        #    errors["base"] = "invalid_playlist"
+        #    return self.async_show_form(
+        #        step_id="user", data_schema=STEP_USER_DATA_SCHEMA, errors=errors
+        #    )
 
         return self.async_create_entry(title="Remote Playlists", data=user_input)
