@@ -5,7 +5,9 @@
                 "description": "Please enter a remotely accessible playlist URL.",
                 "data": {
                     "title": "My Playlist",
-                    "playlist_url": "https://example.com/playlist.m3u"
+                    "playlist_url": "https://example.com/playlist.m3u",
+                    "icon_url": "https://example.com/icon.png",
+                    "mime_type": "video/mp4"
                 }
             }
         },
